@@ -2,7 +2,7 @@ package model
 
 import (
 	"errors"
-	_ "gorm.io/driver/sqlite"
+	"fmt"
 	"one-api/common"
 )
 
@@ -40,12 +40,12 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
-func Redeem(key string, tokenId int) (quota int, err error) {
+func Redeem(key string, userId int) (quota int, err error) {
 	if key == "" {
 		return 0, errors.New("未提供兑换码")
 	}
-	if tokenId == 0 {
-		return 0, errors.New("未提供 token id")
+	if userId == 0 {
+		return 0, errors.New("无效的 user id")
 	}
 	redemption := &Redemption{}
 	err = DB.Where("`key` = ?", key).First(redemption).Error
@@ -55,7 +55,7 @@ func Redeem(key string, tokenId int) (quota int, err error) {
 	if redemption.Status != common.RedemptionCodeStatusEnabled {
 		return 0, errors.New("该兑换码已被使用")
 	}
-	err = TopUpToken(tokenId, redemption.Quota)
+	err = IncreaseUserQuota(userId, redemption.Quota)
 	if err != nil {
 		return 0, err
 	}
@@ -66,6 +66,7 @@ func Redeem(key string, tokenId int) (quota int, err error) {
 		if err != nil {
 			common.SysError("更新兑换码状态失败：" + err.Error())
 		}
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %d 点额度", redemption.Quota))
 	}()
 	return redemption.Quota, nil
 }
@@ -84,7 +85,7 @@ func (redemption *Redemption) SelectUpdate() error {
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (redemption *Redemption) Update() error {
 	var err error
-	err = DB.Model(redemption).Select("name", "status", "redeemed_time").Updates(redemption).Error
+	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time").Updates(redemption).Error
 	return err
 }
 

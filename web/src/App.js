@@ -9,7 +9,7 @@ import NotFound from './pages/NotFound';
 import Setting from './pages/Setting';
 import EditUser from './pages/User/EditUser';
 import AddUser from './pages/User/AddUser';
-import { API, showError, showNotice } from './helpers';
+import { API, getLogo, getSystemName, showError, showNotice } from './helpers';
 import PasswordResetForm from './components/PasswordResetForm';
 import GitHubOAuth from './components/GitHubOAuth';
 import PasswordResetConfirm from './components/PasswordResetConfirm';
@@ -19,9 +19,11 @@ import Channel from './pages/Channel';
 import Token from './pages/Token';
 import EditToken from './pages/Token/EditToken';
 import EditChannel from './pages/Channel/EditChannel';
-import AddChannel from './pages/Channel/AddChannel';
 import Redemption from './pages/Redemption';
 import EditRedemption from './pages/Redemption/EditRedemption';
+import TopUp from './pages/TopUp';
+import Log from './pages/Log';
+import Chat from './pages/Chat';
 
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
@@ -43,7 +45,14 @@ function App() {
     if (success) {
       localStorage.setItem('status', JSON.stringify(data));
       statusDispatch({ type: 'set', payload: data });
+      localStorage.setItem('system_name', data.system_name);
+      localStorage.setItem('logo', data.logo);
       localStorage.setItem('footer_html', data.footer_html);
+      if (data.chat_link) {
+        localStorage.setItem('chat_link', data.chat_link);
+      } else {
+        localStorage.removeItem('chat_link');
+      }
       if (
         data.version !== process.env.REACT_APP_VERSION &&
         data.version !== 'v0.0.0' &&
@@ -61,6 +70,17 @@ function App() {
   useEffect(() => {
     loadUser();
     loadStatus().then();
+    let systemName = getSystemName();
+    if (systemName) {
+      document.title = systemName;
+    }
+    let logo = getLogo();
+    if (logo) {
+      let linkElement = document.querySelector("link[rel~='icon']");
+      if (linkElement) {
+        linkElement.href = logo;
+      }
+    }
   }, []);
 
   return (
@@ -93,7 +113,7 @@ function App() {
         path='/channel/add'
         element={
           <Suspense fallback={<Loading></Loading>}>
-            <AddChannel />
+            <EditChannel />
           </Suspense>
         }
       />
@@ -228,10 +248,36 @@ function App() {
         }
       />
       <Route
+        path='/topup'
+        element={
+        <PrivateRoute>
+          <Suspense fallback={<Loading></Loading>}>
+            <TopUp />
+          </Suspense>
+        </PrivateRoute>
+        }
+      />
+      <Route
+        path='/log'
+        element={
+          <PrivateRoute>
+            <Log />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path='/about'
         element={
           <Suspense fallback={<Loading></Loading>}>
             <About />
+          </Suspense>
+        }
+      />
+      <Route
+        path='/chat'
+        element={
+          <Suspense fallback={<Loading></Loading>}>
+            <Chat />
           </Suspense>
         }
       />

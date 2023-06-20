@@ -85,6 +85,8 @@ func RootAuth() func(c *gin.Context) {
 func TokenAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		key := c.Request.Header.Get("Authorization")
+		key = strings.TrimPrefix(key, "Bearer ")
+		key = strings.TrimPrefix(key, "sk-")
 		parts := strings.Split(key, "-")
 		key = parts[0]
 		token, err := model.ValidateUserToken(key)
@@ -110,7 +112,13 @@ func TokenAuth() func(c *gin.Context) {
 		}
 		c.Set("id", token.UserId)
 		c.Set("token_id", token.Id)
-		c.Set("unlimited_times", token.UnlimitedTimes)
+		c.Set("token_name", token.Name)
+		requestURL := c.Request.URL.String()
+		consumeQuota := true
+		if strings.HasPrefix(requestURL, "/v1/models") {
+			consumeQuota = false
+		}
+		c.Set("consume_quota", consumeQuota)
 		if len(parts) > 1 {
 			if model.IsAdmin(token.UserId) {
 				c.Set("channelId", parts[1])

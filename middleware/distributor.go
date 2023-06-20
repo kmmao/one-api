@@ -7,10 +7,18 @@ import (
 	"one-api/common"
 	"one-api/model"
 	"strconv"
+	"strings"
 )
+
+type ModelRequest struct {
+	Model string `json:"model"`
+}
 
 func Distribute() func(c *gin.Context) {
 	return func(c *gin.Context) {
+		userId := c.GetInt("id")
+		userGroup, _ := model.GetUserGroup(userId)
+		c.Set("group", userGroup)
 		var channel *model.Channel
 		channelId, ok := c.Get("channelId")
 		if ok {
@@ -48,8 +56,24 @@ func Distribute() func(c *gin.Context) {
 			}
 		} else {
 			// Select a channel for the user
-			var err error
-			channel, err = model.GetRandomChannel()
+			var modelRequest ModelRequest
+			err := common.UnmarshalBodyReusable(c, &modelRequest)
+			if err != nil {
+				c.JSON(200, gin.H{
+					"error": gin.H{
+						"message": "无效的请求",
+						"type":    "one_api_error",
+					},
+				})
+				c.Abort()
+				return
+			}
+			if strings.HasPrefix(c.Request.URL.Path, "/v1/moderations") {
+				if modelRequest.Model == "" {
+					modelRequest.Model = "text-moderation-stable"
+				}
+			}
+			channel, err = model.GetRandomSatisfiedChannel(userGroup, modelRequest.Model)
 			if err != nil {
 				c.JSON(200, gin.H{
 					"error": gin.H{
@@ -62,9 +86,12 @@ func Distribute() func(c *gin.Context) {
 			}
 		}
 		c.Set("channel", channel.Type)
+		c.Set("channel_id", channel.Id)
+		c.Set("channel_name", channel.Name)
 		c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
-		if channel.Type == common.ChannelTypeCustom {
-			c.Set("base_url", channel.BaseURL)
+		c.Set("base_url", channel.BaseURL)
+		if channel.Type == common.ChannelTypeAzure {
+			c.Set("api_version", channel.Other)
 		}
 		c.Next()
 	}

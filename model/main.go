@@ -26,6 +26,7 @@ func createRootAccountIfNeed() error {
 			Status:      common.UserStatusEnabled,
 			DisplayName: "Root User",
 			AccessToken: common.GetUUID(),
+			Quota:       100000000,
 		}
 		DB.Create(&rootUser)
 	}
@@ -71,6 +72,14 @@ func InitDB() (err error) {
 			return err
 		}
 		err = db.AutoMigrate(&Redemption{})
+		if err != nil {
+			return err
+		}
+		err = db.AutoMigrate(&Ability{})
+		if err != nil {
+			return err
+		}
+		err = db.AutoMigrate(&Log{})
 		if err != nil {
 			return err
 		}

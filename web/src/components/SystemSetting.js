@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Divider, Form, Grid, Header, Message } from 'semantic-ui-react';
-import { API, removeTrailingSlash, showError } from '../helpers';
+import { API, removeTrailingSlash, showError, verifyJSON } from '../helpers';
 
 const SystemSetting = () => {
   let [inputs, setInputs] = useState({
@@ -12,7 +12,9 @@ const SystemSetting = () => {
     GitHubClientSecret: '',
     Notice: '',
     SMTPServer: '',
+    SMTPPort: '',
     SMTPAccount: '',
+    SMTPFrom: '',
     SMTPToken: '',
     ServerAddress: '',
     Footer: '',
@@ -24,14 +26,12 @@ const SystemSetting = () => {
     TurnstileSiteKey: '',
     TurnstileSecretKey: '',
     RegisterEnabled: '',
-    QuotaForNewUser: 0,
-    TopUpLink: ''
   });
-  let originInputs = {};
+  const [originInputs, setOriginInputs] = useState({});
   let [loading, setLoading] = useState(false);
 
   const getOptions = async () => {
-    const res = await API.get('/api/option');
+    const res = await API.get('/api/option/');
     const { success, message, data } = res.data;
     if (success) {
       let newInputs = {};
@@ -39,7 +39,7 @@ const SystemSetting = () => {
         newInputs[item.key] = item.value;
       });
       setInputs(newInputs);
-      originInputs = newInputs;
+      setOriginInputs(newInputs);
     } else {
       showError(message);
     }
@@ -64,7 +64,7 @@ const SystemSetting = () => {
       default:
         break;
     }
-    const res = await API.put('/api/option', {
+    const res = await API.put('/api/option/', {
       key,
       value
     });
@@ -88,9 +88,7 @@ const SystemSetting = () => {
       name === 'WeChatServerToken' ||
       name === 'WeChatAccountQRCodeImageURL' ||
       name === 'TurnstileSiteKey' ||
-      name === 'TurnstileSecretKey' ||
-      name === 'QuotaForNewUser' ||
-      name === 'TopUpLink'
+      name === 'TurnstileSecretKey'
     ) {
       setInputs((inputs) => ({ ...inputs, [name]: value }));
     } else {
@@ -103,21 +101,21 @@ const SystemSetting = () => {
     await updateOption('ServerAddress', ServerAddress);
   };
 
-  const submitOperationConfig = async () => {
-    if (originInputs['QuotaForNewUser'] !== inputs.QuotaForNewUser) {
-      await updateOption('QuotaForNewUser', inputs.QuotaForNewUser);
-    }
-    if (originInputs['TopUpLink'] !== inputs.TopUpLink) {
-      await updateOption('TopUpLink', inputs.TopUpLink);
-    }
-  }
-
   const submitSMTP = async () => {
     if (originInputs['SMTPServer'] !== inputs.SMTPServer) {
       await updateOption('SMTPServer', inputs.SMTPServer);
     }
     if (originInputs['SMTPAccount'] !== inputs.SMTPAccount) {
       await updateOption('SMTPAccount', inputs.SMTPAccount);
+    }
+    if (originInputs['SMTPFrom'] !== inputs.SMTPFrom) {
+      await updateOption('SMTPFrom', inputs.SMTPFrom);
+    }
+    if (
+      originInputs['SMTPPort'] !== inputs.SMTPPort &&
+      inputs.SMTPPort !== ''
+    ) {
+      await updateOption('SMTPPort', inputs.SMTPPort);
     }
     if (
       originInputs['SMTPToken'] !== inputs.SMTPToken &&
@@ -242,32 +240,6 @@ const SystemSetting = () => {
           </Form.Group>
           <Divider />
           <Header as='h3'>
-            运营设置
-          </Header>
-          <Form.Group widths={3}>
-            <Form.Input
-              label='新用户初始配额'
-              name='QuotaForNewUser'
-              onChange={handleInputChange}
-              autoComplete='off'
-              value={inputs.QuotaForNewUser}
-              type='number'
-              min='0'
-              placeholder='例如：100'
-            />
-            <Form.Input
-              label='充值链接'
-              name='TopUpLink'
-              onChange={handleInputChange}
-              autoComplete='off'
-              value={inputs.TopUpLink}
-              type='link'
-              placeholder='例如发卡网站的购买链接'
-            />
-          </Form.Group>
-          <Form.Button onClick={submitOperationConfig}>保存运营设置</Form.Button>
-          <Divider />
-          <Header as='h3'>
             配置 SMTP
             <Header.Subheader>用以支持系统的邮件发送</Header.Subheader>
           </Header>
@@ -276,24 +248,42 @@ const SystemSetting = () => {
               label='SMTP 服务器地址'
               name='SMTPServer'
               onChange={handleInputChange}
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.SMTPServer}
               placeholder='例如：smtp.qq.com'
+            />
+            <Form.Input
+              label='SMTP 端口'
+              name='SMTPPort'
+              onChange={handleInputChange}
+              autoComplete='new-password'
+              value={inputs.SMTPPort}
+              placeholder='默认: 587'
             />
             <Form.Input
               label='SMTP 账户'
               name='SMTPAccount'
               onChange={handleInputChange}
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.SMTPAccount}
               placeholder='通常是邮箱地址'
+            />
+          </Form.Group>
+          <Form.Group widths={3}>
+            <Form.Input
+              label='SMTP 发送者邮箱'
+              name='SMTPFrom'
+              onChange={handleInputChange}
+              autoComplete='new-password'
+              value={inputs.SMTPFrom}
+              placeholder='通常和邮箱地址保持一致'
             />
             <Form.Input
               label='SMTP 访问凭证'
               name='SMTPToken'
               onChange={handleInputChange}
               type='password'
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.SMTPToken}
               placeholder='敏感信息不会发送到前端显示'
             />
@@ -320,7 +310,7 @@ const SystemSetting = () => {
               label='GitHub Client ID'
               name='GitHubClientId'
               onChange={handleInputChange}
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.GitHubClientId}
               placeholder='输入你注册的 GitHub OAuth APP 的 ID'
             />
@@ -329,7 +319,7 @@ const SystemSetting = () => {
               name='GitHubClientSecret'
               onChange={handleInputChange}
               type='password'
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.GitHubClientSecret}
               placeholder='敏感信息不会发送到前端显示'
             />
@@ -357,7 +347,7 @@ const SystemSetting = () => {
               name='WeChatServerAddress'
               placeholder='例如：https://yourdomain.com'
               onChange={handleInputChange}
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.WeChatServerAddress}
             />
             <Form.Input
@@ -365,7 +355,7 @@ const SystemSetting = () => {
               name='WeChatServerToken'
               type='password'
               onChange={handleInputChange}
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.WeChatServerToken}
               placeholder='敏感信息不会发送到前端显示'
             />
@@ -373,7 +363,7 @@ const SystemSetting = () => {
               label='微信公众号二维码图片链接'
               name='WeChatAccountQRCodeImageURL'
               onChange={handleInputChange}
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.WeChatAccountQRCodeImageURL}
               placeholder='输入一个图片链接'
             />
@@ -397,7 +387,7 @@ const SystemSetting = () => {
               label='Turnstile Site Key'
               name='TurnstileSiteKey'
               onChange={handleInputChange}
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.TurnstileSiteKey}
               placeholder='输入你注册的 Turnstile Site Key'
             />
@@ -406,7 +396,7 @@ const SystemSetting = () => {
               name='TurnstileSecretKey'
               onChange={handleInputChange}
               type='password'
-              autoComplete='off'
+              autoComplete='new-password'
               value={inputs.TurnstileSecretKey}
               placeholder='敏感信息不会发送到前端显示'
             />

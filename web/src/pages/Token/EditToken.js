@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Form, Header, Segment } from 'semantic-ui-react';
+import { Button, Form, Header, Message, Segment } from 'semantic-ui-react';
 import { useParams } from 'react-router-dom';
-import { API, isAdmin, showError, showSuccess, timestamp2string } from '../../helpers';
+import { API, showError, showSuccess, timestamp2string } from '../../helpers';
 
 const EditToken = () => {
   const params = useParams();
@@ -10,13 +10,12 @@ const EditToken = () => {
   const [loading, setLoading] = useState(isEdit);
   const originInputs = {
     name: '',
-    remain_times: 0,
+    remain_quota: 0,
     expired_time: -1,
-    unlimited_times: false
+    unlimited_quota: false
   };
-  const isAdminUser = isAdmin();
   const [inputs, setInputs] = useState(originInputs);
-  const { name, remain_times, expired_time, unlimited_times } = inputs;
+  const { name, remain_quota, expired_time, unlimited_quota } = inputs;
 
   const handleInputChange = (e, { name, value }) => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
@@ -37,8 +36,8 @@ const EditToken = () => {
     }
   };
 
-  const setUnlimitedTimes = () => {
-    setInputs({ ...inputs, unlimited_times: !unlimited_times });
+  const setUnlimitedQuota = () => {
+    setInputs({ ...inputs, unlimited_quota: !unlimited_quota });
   };
 
   const loadToken = async () => {
@@ -63,7 +62,7 @@ const EditToken = () => {
   const submit = async () => {
     if (!isEdit && inputs.name === '') return;
     let localInputs = inputs;
-    localInputs.remain_times = parseInt(localInputs.remain_times);
+    localInputs.remain_quota = parseInt(localInputs.remain_quota);
     if (localInputs.expired_time !== -1) {
       let time = Date.parse(localInputs.expired_time);
       if (isNaN(time)) {
@@ -95,7 +94,7 @@ const EditToken = () => {
     <>
       <Segment loading={loading}>
         <Header as='h3'>{isEdit ? '更新令牌信息' : '创建新的令牌'}</Header>
-        <Form autoComplete='off'>
+        <Form autoComplete='new-password'>
           <Form.Field>
             <Form.Input
               label='名称'
@@ -103,29 +102,10 @@ const EditToken = () => {
               placeholder={'请输入名称'}
               onChange={handleInputChange}
               value={name}
-              autoComplete='off'
+              autoComplete='new-password'
               required={!isEdit}
             />
           </Form.Field>
-          {
-            isAdminUser && <>
-              <Form.Field>
-                <Form.Input
-                  label='剩余次数'
-                  name='remain_times'
-                  placeholder={'请输入剩余次数'}
-                  onChange={handleInputChange}
-                  value={remain_times}
-                  autoComplete='off'
-                  type='number'
-                  disabled={unlimited_times}
-                />
-              </Form.Field>
-              <Button type={'button'} style={{marginBottom: '14px'}} onClick={() => {
-                setUnlimitedTimes();
-              }}>{unlimited_times ? '取消无限次' : '设置为无限次'}</Button>
-            </>
-          }
           <Form.Field>
             <Form.Input
               label='过期时间'
@@ -133,26 +113,44 @@ const EditToken = () => {
               placeholder={'请输入过期时间，格式为 yyyy-MM-dd HH:mm:ss，-1 表示无限制'}
               onChange={handleInputChange}
               value={expired_time}
-              autoComplete='off'
+              autoComplete='new-password'
               type='datetime-local'
             />
           </Form.Field>
+          <div style={{ lineHeight: '40px' }}>
+            <Button type={'button'} onClick={() => {
+              setExpiredTime(0, 0, 0, 0);
+            }}>永不过期</Button>
+            <Button type={'button'} onClick={() => {
+              setExpiredTime(1, 0, 0, 0);
+            }}>一个月后过期</Button>
+            <Button type={'button'} onClick={() => {
+              setExpiredTime(0, 1, 0, 0);
+            }}>一天后过期</Button>
+            <Button type={'button'} onClick={() => {
+              setExpiredTime(0, 0, 1, 0);
+            }}>一小时后过期</Button>
+            <Button type={'button'} onClick={() => {
+              setExpiredTime(0, 0, 0, 1);
+            }}>一分钟后过期</Button>
+          </div>
+          <Message>注意，令牌的额度仅用于限制令牌本身的最大额度使用量，实际的使用受到账户的剩余额度限制。</Message>
+          <Form.Field>
+            <Form.Input
+              label='额度'
+              name='remain_quota'
+              placeholder={'请输入额度'}
+              onChange={handleInputChange}
+              value={remain_quota}
+              autoComplete='new-password'
+              type='number'
+              disabled={unlimited_quota}
+            />
+          </Form.Field>
           <Button type={'button'} onClick={() => {
-            setExpiredTime(0, 0, 0, 0);
-          }}>永不过期</Button>
-          <Button type={'button'} onClick={() => {
-            setExpiredTime(1, 0, 0, 0);
-          }}>一个月后过期</Button>
-          <Button type={'button'} onClick={() => {
-            setExpiredTime(0, 1, 0, 0);
-          }}>一天后过期</Button>
-          <Button type={'button'} onClick={() => {
-            setExpiredTime(0, 0, 1, 0);
-          }}>一小时后过期</Button>
-          <Button type={'button'} onClick={() => {
-            setExpiredTime(0, 0, 0, 1);
-          }}>一分钟后过期</Button>
-          <Button onClick={submit}>提交</Button>
+            setUnlimitedQuota();
+          }}>{unlimited_quota ? '取消无限额度' : '设置为无限额度'}</Button>
+          <Button positive onClick={submit}>提交</Button>
         </Form>
       </Segment>
     </>

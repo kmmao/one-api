@@ -3,56 +3,76 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserContext } from '../context/User';
 
 import { Button, Container, Dropdown, Icon, Menu, Segment } from 'semantic-ui-react';
-import { API, isAdmin, isMobile, showSuccess } from '../helpers';
+import { API, getLogo, getSystemName, isAdmin, isMobile, showSuccess } from '../helpers';
 import '../index.css';
 
 // Header Buttons
-const headerButtons = [
+let headerButtons = [
   {
     name: '首页',
     to: '/',
-    icon: 'home',
+    icon: 'home'
   },
   {
     name: '渠道',
     to: '/channel',
     icon: 'sitemap',
-    admin: true,
+    admin: true
   },
   {
     name: '令牌',
     to: '/token',
-    icon: 'key',
+    icon: 'key'
   },
   {
     name: '兑换',
     to: '/redemption',
     icon: 'dollar sign',
-    admin: true,
+    admin: true
+  },
+  {
+    name: '充值',
+    to: '/topup',
+    icon: 'cart'
   },
   {
     name: '用户',
     to: '/user',
     icon: 'user',
-    admin: true,
+    admin: true
+  },
+  {
+    name: '日志',
+    to: '/log',
+    icon: 'book'
   },
   {
     name: '设置',
     to: '/setting',
-    icon: 'setting',
+    icon: 'setting'
   },
   {
     name: '关于',
     to: '/about',
-    icon: 'info circle',
-  },
+    icon: 'info circle'
+  }
 ];
+
+if (localStorage.getItem('chat_link')) {
+  headerButtons.splice(1, 0, {
+    name: '聊天',
+    to: '/chat',
+    icon: 'comments'
+  });
+}
 
 const Header = () => {
   const [userState, userDispatch] = useContext(UserContext);
   let navigate = useNavigate();
 
   const [showSidebar, setShowSidebar] = useState(false);
+  const systemName = getSystemName();
+  const logo = getLogo();
 
   async function logout() {
     setShowSidebar(false);
@@ -100,23 +120,23 @@ const Header = () => {
           style={
             showSidebar
               ? {
-                  borderBottom: 'none',
-                  marginBottom: '0',
-                  borderTop: 'none',
-                  height: '51px',
-                }
+                borderBottom: 'none',
+                marginBottom: '0',
+                borderTop: 'none',
+                height: '51px'
+              }
               : { borderTop: 'none', height: '52px' }
           }
         >
           <Container>
             <Menu.Item as={Link} to='/'>
               <img
-                src='/logo.png'
+                src={logo}
                 alt='logo'
                 style={{ marginRight: '0.75em' }}
               />
               <div style={{ fontSize: '20px' }}>
-                <b>One API</b>
+                <b>{systemName}</b>
               </div>
             </Menu.Item>
             <Menu.Menu position='right'>
@@ -168,9 +188,9 @@ const Header = () => {
       <Menu borderless style={{ borderTop: 'none' }}>
         <Container>
           <Menu.Item as={Link} to='/' className={'hide-on-mobile'}>
-            <img src='/logo.png' alt='logo' style={{ marginRight: '0.75em' }} />
+            <img src={logo} alt='logo' style={{ marginRight: '0.75em' }} />
             <div style={{ fontSize: '20px' }}>
-              <b>One API</b>
+              <b>{systemName}</b>
             </div>
           </Menu.Item>
           {renderButtons(false)}

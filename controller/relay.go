@@ -1,122 +1,153 @@
 package controller
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"io"
 	"net/http"
 	"one-api/common"
-	"one-api/model"
 	"strings"
 )
 
+type Message struct {
+	Role    string  `json:"role"`
+	Content string  `json:"content"`
+	Name    *string `json:"name,omitempty"`
+}
+
+const (
+	RelayModeUnknown = iota
+	RelayModeChatCompletions
+	RelayModeCompletions
+	RelayModeEmbeddings
+	RelayModeModeration
+	RelayModeImagesGenerations
+)
+
+// https://platform.openai.com/docs/api-reference/chat
+
+type GeneralOpenAIRequest struct {
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Prompt      any       `json:"prompt"`
+	Stream      bool      `json:"stream"`
+	MaxTokens   int       `json:"max_tokens"`
+	Temperature float64   `json:"temperature"`
+	TopP        float64   `json:"top_p"`
+	N           int       `json:"n"`
+	Input       any       `json:"input"`
+}
+
+type ChatRequest struct {
+	Model     string    `json:"model"`
+	Messages  []Message `json:"messages"`
+	MaxTokens int       `json:"max_tokens"`
+}
+
+type TextRequest struct {
+	Model     string    `json:"model"`
+	Messages  []Message `json:"messages"`
+	Prompt    string    `json:"prompt"`
+	MaxTokens int       `json:"max_tokens"`
+	//Stream   bool      `json:"stream"`
+}
+
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+type OpenAIError struct {
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Param   string `json:"param"`
+	Code    any    `json:"code"`
+}
+
+type OpenAIErrorWithStatusCode struct {
+	OpenAIError
+	StatusCode int `json:"status_code"`
+}
+
+type TextResponse struct {
+	Usage `json:"usage"`
+	Error OpenAIError `json:"error"`
+}
+
+type ChatCompletionsStreamResponse struct {
+	Choices []struct {
+		Delta struct {
+			Content string `json:"content"`
+		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+}
+
+type CompletionsStreamResponse struct {
+	Choices []struct {
+		Text         string `json:"text"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+}
+
 func Relay(c *gin.Context) {
-	channelType := c.GetInt("channel")
-	tokenId := c.GetInt("token_id")
-	isUnlimitedTimes := c.GetBool("unlimited_times")
-	baseURL := common.ChannelBaseURLs[channelType]
-	if channelType == common.ChannelTypeCustom {
-		baseURL = c.GetString("base_url")
+	relayMode := RelayModeUnknown
+	if strings.HasPrefix(c.Request.URL.Path, "/v1/chat/completions") {
+		relayMode = RelayModeChatCompletions
+	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/completions") {
+		relayMode = RelayModeCompletions
+	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/embeddings") {
+		relayMode = RelayModeEmbeddings
+	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/moderations") {
+		relayMode = RelayModeModeration
+	} else if strings.HasPrefix(c.Request.URL.Path, "/v1/images/generations") {
+		relayMode = RelayModeImagesGenerations
 	}
-	requestURL := c.Request.URL.String()
-	req, err := http.NewRequest(c.Request.Method, fmt.Sprintf("%s%s", baseURL, requestURL), c.Request.Body)
+	var err *OpenAIErrorWithStatusCode
+	switch relayMode {
+	case RelayModeImagesGenerations:
+		err = relayImageHelper(c, relayMode)
+	default:
+		err = relayTextHelper(c, relayMode)
+	}
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"error": gin.H{
-				"message": err.Error(),
-				"type":    "one_api_error",
-			},
-		})
-		return
-	}
-	//req.Header = c.Request.Header.Clone()
-	// Fix HTTP Decompression failed
-	// https://github.com/stoplightio/prism/issues/1064#issuecomment-824682360
-	//req.Header.Del("Accept-Encoding")
-	req.Header.Set("Authorization", c.Request.Header.Get("Authorization"))
-	req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
-	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
-	req.Header.Set("Connection", c.Request.Header.Get("Connection"))
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"error": gin.H{
-				"message": err.Error(),
-				"type":    "one_api_error",
-			},
-		})
-		return
-	}
-
-	defer func() {
-		err := req.Body.Close()
-		if err != nil {
-			common.SysError("Error closing request body: " + err.Error())
+		if err.StatusCode == http.StatusTooManyRequests {
+			err.OpenAIError.Message = "当前分组负载已饱和，请稍后再试，或升级账户以提升服务质量。"
 		}
-		if !isUnlimitedTimes && requestURL == "/v1/chat/completions" {
-			err := model.DecreaseTokenRemainTimesById(tokenId)
-			if err != nil {
-				common.SysError("Error decreasing token remain times: " + err.Error())
-			}
-		}
-	}()
-	isStream := resp.Header.Get("Content-Type") == "text/event-stream"
-	if isStream {
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-			if atEOF && len(data) == 0 {
-				return 0, nil, nil
-			}
-
-			if i := strings.Index(string(data), "\n\n"); i >= 0 {
-				return i + 2, data[0:i], nil
-			}
-
-			if atEOF {
-				return len(data), data, nil
-			}
-
-			return 0, nil, nil
+		c.JSON(err.StatusCode, gin.H{
+			"error": err.OpenAIError,
 		})
-		dataChan := make(chan string)
-		stopChan := make(chan bool)
-		go func() {
-			for scanner.Scan() {
-				data := scanner.Text()
-				dataChan <- data
-			}
-			stopChan <- true
-		}()
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		c.Writer.Header().Set("Cache-Control", "no-cache")
-		c.Writer.Header().Set("Connection", "keep-alive")
-		c.Writer.Header().Set("Transfer-Encoding", "chunked")
-		c.Stream(func(w io.Writer) bool {
-			select {
-			case data := <-dataChan:
-				c.Render(-1, common.CustomEvent{Data: data})
-				return true
-			case <-stopChan:
-				return false
-			}
-		})
-		return
-	} else {
-		for k, v := range resp.Header {
-			c.Writer.Header().Set(k, v[0])
-		}
-		_, err = io.Copy(c.Writer, resp.Body)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"error": gin.H{
-					"message": err.Error(),
-					"type":    "one_api_error",
-				},
-			})
-			return
+		channelId := c.GetInt("channel_id")
+		common.SysError(fmt.Sprintf("Relay error (channel #%d): %s", channelId, err.Message))
+		// https://platform.openai.com/docs/guides/error-codes/api-errors
+		if common.AutomaticDisableChannelEnabled && (err.Type == "insufficient_quota" || err.Code == "invalid_api_key") {
+			channelId := c.GetInt("channel_id")
+			channelName := c.GetString("channel_name")
+			disableChannel(channelId, channelName, err.Message)
 		}
 	}
+}
+
+func RelayNotImplemented(c *gin.Context) {
+	err := OpenAIError{
+		Message: "API not implemented",
+		Type:    "one_api_error",
+		Param:   "",
+		Code:    "api_not_implemented",
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"error": err,
+	})
+}
+
+func RelayNotFound(c *gin.Context) {
+	err := OpenAIError{
+		Message: fmt.Sprintf("API not found: %s:%s", c.Request.Method, c.Request.URL.Path),
+		Type:    "one_api_error",
+		Param:   "",
+		Code:    "api_not_found",
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"error": err,
+	})
 }

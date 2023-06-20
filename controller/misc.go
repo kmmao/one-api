@@ -20,6 +20,7 @@ func GetStatus(c *gin.Context) {
 			"github_oauth":       common.GitHubOAuthEnabled,
 			"github_client_id":   common.GitHubClientId,
 			"system_name":        common.SystemName,
+			"logo":               common.Logo,
 			"footer_html":        common.Footer,
 			"wechat_qrcode":      common.WeChatAccountQRCodeImageURL,
 			"wechat_login":       common.WeChatAuthEnabled,
@@ -27,6 +28,7 @@ func GetStatus(c *gin.Context) {
 			"turnstile_check":    common.TurnstileCheckEnabled,
 			"turnstile_site_key": common.TurnstileSiteKey,
 			"top_up_link":        common.TopUpLink,
+			"chat_link":          common.ChatLink,
 		},
 	})
 	return
@@ -50,6 +52,17 @@ func GetAbout(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    common.OptionMap["About"],
+	})
+	return
+}
+
+func GetHomePageContent(c *gin.Context) {
+	common.OptionMapRWMutex.RLock()
+	defer common.OptionMapRWMutex.RUnlock()
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    common.OptionMap["HomePageContent"],
 	})
 	return
 }

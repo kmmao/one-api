@@ -9,7 +9,7 @@ import {
   Segment,
 } from 'semantic-ui-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API, showError, showInfo, showSuccess } from '../helpers';
+import { API, getLogo, showError, showInfo, showSuccess } from '../helpers';
 import Turnstile from 'react-turnstile';
 
 const RegisterForm = () => {
@@ -26,6 +26,11 @@ const RegisterForm = () => {
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [loading, setLoading] = useState(false);
+  const logo = getLogo();
+  let affCode = new URLSearchParams(window.location.search).get('aff');
+  if (affCode) {
+    localStorage.setItem('aff', affCode);
+  }
 
   useEffect(() => {
     let status = localStorage.getItem('status');
@@ -62,6 +67,10 @@ const RegisterForm = () => {
         return;
       }
       setLoading(true);
+      if (!affCode) {
+        affCode = localStorage.getItem('aff');
+      }
+      inputs.aff_code = affCode;
       const res = await API.post(
         `/api/user/register?turnstile=${turnstileToken}`,
         inputs
@@ -100,7 +109,7 @@ const RegisterForm = () => {
     <Grid textAlign='center' style={{ marginTop: '48px' }}>
       <Grid.Column style={{ maxWidth: 450 }}>
         <Header as='h2' color='' textAlign='center'>
-          <Image src='/logo.png' /> 新用户注册
+          <Image src={logo} /> 新用户注册
         </Header>
         <Form size='large'>
           <Segment>

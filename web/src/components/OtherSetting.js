@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Divider, Form, Grid, Header, Modal } from 'semantic-ui-react';
+import { Button, Divider, Form, Grid, Header, Message, Modal } from 'semantic-ui-react';
 import { API, showError, showSuccess } from '../helpers';
 import { marked } from 'marked';
 
@@ -8,17 +8,19 @@ const OtherSetting = () => {
     Footer: '',
     Notice: '',
     About: '',
+    SystemName: '',
+    Logo: '',
+    HomePageContent: ''
   });
-  let originInputs = {};
   let [loading, setLoading] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateData, setUpdateData] = useState({
     tag_name: '',
-    content: '',
+    content: ''
   });
 
   const getOptions = async () => {
-    const res = await API.get('/api/option');
+    const res = await API.get('/api/option/');
     const { success, message, data } = res.data;
     if (success) {
       let newInputs = {};
@@ -28,7 +30,6 @@ const OtherSetting = () => {
         }
       });
       setInputs(newInputs);
-      originInputs = newInputs;
     } else {
       showError(message);
     }
@@ -40,9 +41,9 @@ const OtherSetting = () => {
 
   const updateOption = async (key, value) => {
     setLoading(true);
-    const res = await API.put('/api/option', {
+    const res = await API.put('/api/option/', {
       key,
-      value,
+      value
     });
     const { success, message } = res.data;
     if (success) {
@@ -65,8 +66,20 @@ const OtherSetting = () => {
     await updateOption('Footer', inputs.Footer);
   };
 
+  const submitSystemName = async () => {
+    await updateOption('SystemName', inputs.SystemName);
+  };
+
+  const submitLogo = async () => {
+    await updateOption('Logo', inputs.Logo);
+  };
+
   const submitAbout = async () => {
     await updateOption('About', inputs.About);
+  };
+
+  const submitOption = async (key) => {
+    await updateOption(key, inputs[key]);
   };
 
   const openGitHubRelease = () => {
@@ -84,7 +97,7 @@ const OtherSetting = () => {
     } else {
       setUpdateData({
         tag_name: tag_name,
-        content: marked.parse(body),
+        content: marked.parse(body)
       });
       setShowUpdateModal(true);
     }
@@ -110,9 +123,41 @@ const OtherSetting = () => {
           <Divider />
           <Header as='h3'>个性化设置</Header>
           <Form.Group widths='equal'>
+            <Form.Input
+              label='系统名称'
+              placeholder='在此输入系统名称'
+              value={inputs.SystemName}
+              name='SystemName'
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+          <Form.Button onClick={submitSystemName}>设置系统名称</Form.Button>
+          <Form.Group widths='equal'>
+            <Form.Input
+              label='Logo 图片地址'
+              placeholder='在此输入 Logo 图片地址'
+              value={inputs.Logo}
+              name='Logo'
+              type='url'
+              onChange={handleInputChange}
+            />
+          </Form.Group>
+          <Form.Button onClick={submitLogo}>设置 Logo</Form.Button>
+          <Form.Group widths='equal'>
+            <Form.TextArea
+              label='首页内容'
+              placeholder='在此输入首页内容，支持 Markdown & HTML 代码，设置后首页的状态信息将不再显示。如果输入的是一个链接，则会使用该链接作为 iframe 的 src 属性，这允许你设置任意网页作为首页。'
+              value={inputs.HomePageContent}
+              name='HomePageContent'
+              onChange={handleInputChange}
+              style={{ minHeight: 150, fontFamily: 'JetBrains Mono, Consolas' }}
+            />
+          </Form.Group>
+          <Form.Button onClick={() => submitOption('HomePageContent')}>保存首页内容</Form.Button>
+          <Form.Group widths='equal'>
             <Form.TextArea
               label='关于'
-              placeholder='在此输入新的关于内容，支持 Markdown & HTML 代码'
+              placeholder='在此输入新的关于内容，支持 Markdown & HTML 代码。如果输入的是一个链接，则会使用该链接作为 iframe 的 src 属性，这允许你设置任意网页作为关于页面。'
               value={inputs.About}
               name='About'
               onChange={handleInputChange}
@@ -120,6 +165,7 @@ const OtherSetting = () => {
             />
           </Form.Group>
           <Form.Button onClick={submitAbout}>保存关于</Form.Button>
+          <Message>移除 One API 的版权标识必须首先获得授权，项目维护需要花费大量精力，如果本项目对你有意义，请主动支持本项目。</Message>
           <Form.Group widths='equal'>
             <Form.Input
               label='页脚'

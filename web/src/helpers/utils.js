@@ -15,6 +15,22 @@ export function isRoot() {
   return user.role >= 100;
 }
 
+export function getSystemName() {
+  let system_name = localStorage.getItem('system_name');
+  if (!system_name) return 'One API';
+  return system_name;
+}
+
+export function getLogo() {
+  let logo = localStorage.getItem('logo');
+  if (!logo) return '/logo.png';
+  return logo
+}
+
+export function getFooterHTML() {
+  return localStorage.getItem('footer_html');
+}
+
 export async function copy(text) {
   let okay = true;
   try {
@@ -153,3 +169,12 @@ export function downloadTextAsFile(text, filename) {
   a.download = filename;
   a.click();
 }
+
+export const verifyJSON = (str) => {
+  try {
+    JSON.parse(str);
+  } catch (e) {
+    return false;
+  }
+  return true;
+};
